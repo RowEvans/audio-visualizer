@@ -18,6 +18,8 @@ CELL_WIDTH = (WIDTH - 2 * MARGIN - (COLS - 1) * GAP) // COLS
 CELL_HEIGHT = (HEIGHT - 2 * MARGIN - (ROWS - 1) * GAP) // ROWS
 
 OFF_COLOR = (20, 20, 20)
+LIGHT_GRAY = 140
+DARK_GRAY = 40
 
 FFT_SIZE = 2048
 MIN_FREQ = 40
@@ -27,18 +29,33 @@ DB_CEIL = -25
 TILT_DB = 18
 FALL_SPEED = 0.35
 
-def pick_color(row):
+def pick_color_rg(row):
     t = row / (ROWS - 1)
     hue = (1 - t) * (120 / 360)
     r, g, b = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
     return (int(r * 255), int(g * 255), int(b * 255))
 
-def draw_grid(screen, levels):
+def pick_color_gray(row):
+    t = row / (ROWS - 1)
+    v = int(LIGHT_GRAY + (DARK_GRAY - LIGHT_GRAY) * t)
+    return (v, v, v)
+
+COLOR_MODES = [("Red/Green", pick_color_rg), ("Gray", pick_color_gray)]
+BUTTON_RECT = pygame.Rect(WIDTH - 20 - 120, 8, 120, 24)
+
+def draw_button(screen, font, label):
+    hovered = BUTTON_RECT.collidepoint(pygame.mouse.get_pos())
+    bg = (75, 75, 85) if hovered else (50, 50, 58)
+    pygame.draw.rect(screen, bg, BUTTON_RECT, border_radius=6)
+    text = font.render(label, True, (230, 230, 230))
+    screen.blit(text, text.get_rect(center=BUTTON_RECT.center))
+
+def draw_grid(screen, levels, color_fn):
     for col in range(COLS):
         x = MARGIN + col * (CELL_WIDTH + GAP)
         for row in range(ROWS):
             y = HEIGHT - MARGIN - CELL_HEIGHT - row * (CELL_HEIGHT + GAP)
-            color = pick_color(row) if row < levels[col] else OFF_COLOR
+            color = color_fn(row) if row < levels[col] else OFF_COLOR
             pygame.draw.rect(screen, color, (x, y , CELL_WIDTH, CELL_HEIGHT))
 
 buffer = np.zeros(FFT_SIZE, dtype=np.float32)
@@ -79,6 +96,8 @@ pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Audio Visualizer")
 clock = pygame.time.Clock()
+font = pygame.font.SysFont("arial", 16)
+mode = 0
 
 smooth = np.zeros(COLS)
 
@@ -96,12 +115,17 @@ with sd.InputStream(
                 running = False
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 running = False
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if BUTTON_RECT.collidepoint(event.pos):
+                    mode = (mode + 1) % len(COLOR_MODES)
 
         target = compute_levels(band_ranges, window, tilt)
         smooth = np.where(target > smooth, target, np.maximum(target, smooth - FALL_SPEED))
 
+        label, color_fn = COLOR_MODES[mode]
         screen.fill(BG_COLOR)
-        draw_grid(screen, np.round(smooth).astype(int))
+        draw_grid(screen, np.round(smooth).astype(int), color_fn)
+        draw_button(screen, font, label)
         pygame.display.flip()
         clock.tick(FPS)
 
