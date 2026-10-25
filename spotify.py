@@ -30,16 +30,16 @@ def spotify_titles():
     return titles
 
 
-def spotify_is_playing():
+def spotify_now_playing():
     for title in spotify_titles():
         if title.lower() not in IDLE_TITLES and " - " in title:
-            return True
+            return title
 
-    return False
+    return None
 
 if __name__ == "__main__":
     import time
 
     while True:
-        print(spotify_titles(), "->", spotify_is_playing())
+        print(spotify_titles(), "->", spotify_now_playing())
         time.sleep(1)

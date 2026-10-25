@@ -3,7 +3,7 @@ import numpy as np
 import pygame
 import colorsys
 import time
-from spotify import spotify_is_playing
+from spotify import spotify_now_playing
 
 DEVICE = 14
 DISPLAY = 0
@@ -106,7 +106,7 @@ mode = 0
 gain_db = 0
 
 smooth = np.zeros(COLS)
-playing = False
+playing = None
 last_check = 0.0
 
 with sd.InputStream(
@@ -136,7 +136,7 @@ with sd.InputStream(
 
         now = time.time()
         if now - last_check > 1.0:
-            playing = spotify_is_playing()
+            playing = spotify_now_playing()
             last_check = now
 
         if not playing:
@@ -155,6 +155,8 @@ with sd.InputStream(
         draw_button(screen, font, label)
         gain_text = font.render(f"Gain: {gain_db:+d} dB", True, (150, 150, 150))
         screen.blit(gain_text, (MARGIN, 10))
+        song_surf = font.render(f"{playing}", True, (150, 150, 150))
+        screen.blit(song_surf, song_surf.get_rect(center=(WIDTH // 2, HEIGHT - MARGIN // 2)))
         pygame.display.flip()
         clock.tick(FPS)
 
