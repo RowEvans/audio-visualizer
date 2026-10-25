@@ -93,7 +93,7 @@ tilt = np.linspace(0, TILT_DB, COLS)
 
 
 pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
 pygame.display.set_caption("Audio Visualizer")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("arial", 16)
@@ -121,6 +121,8 @@ with sd.InputStream(
                     gain_db += 2
                 if event.key == pygame.K_DOWN:
                     gain_db -= 2
+                if event.key == pygame.K_f:
+                    pygame.display.toggle_fullscreen()
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if BUTTON_RECT.collidepoint(event.pos):
                     mode = (mode + 1) % len(COLOR_MODES)
