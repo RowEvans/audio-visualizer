@@ -2,8 +2,11 @@ import sounddevice as sd
 import numpy as np
 import pygame
 import colorsys
+import time
+from spotify import spotify_is_playing
 
 DEVICE = 14
+DISPLAY = 0
 
 WIDTH, HEIGHT = 800, 480
 FPS = 60
@@ -93,7 +96,9 @@ tilt = np.linspace(0, TILT_DB, COLS)
 
 
 pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED)
+screen = pygame.display.set_mode(
+    (WIDTH, HEIGHT), pygame.SCALED | pygame.FULLSCREEN, display=DISPLAY
+)
 pygame.display.set_caption("Audio Visualizer")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("arial", 16)
@@ -101,6 +106,8 @@ mode = 0
 gain_db = 0
 
 smooth = np.zeros(COLS)
+playing = False
+last_check = 0.0
 
 with sd.InputStream(
     device = DEVICE,
@@ -126,6 +133,18 @@ with sd.InputStream(
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if BUTTON_RECT.collidepoint(event.pos):
                     mode = (mode + 1) % len(COLOR_MODES)
+
+        now = time.time()
+        if now - last_check > 1.0:
+            playing = spotify_is_playing()
+            last_check = now
+
+        if not playing:
+            smooth[:] = 0
+            screen.fill((0, 0, 0))
+            pygame.display.flip()
+            clock.tick(FPS)
+            continue
 
         target = compute_levels(band_ranges, window, tilt, gain_db)
         smooth = np.where(target > smooth, target, np.maximum(target, smooth - FALL_SPEED))
