@@ -40,7 +40,7 @@ def pick_color_gray(row):
     v = int(LIGHT_GRAY + (DARK_GRAY - LIGHT_GRAY) * t)
     return (v, v, v)
 
-COLOR_MODES = [("Red/Green", pick_color_rg), ("Gray", pick_color_gray)]
+COLOR_MODES = [("Gray", pick_color_gray), ("Red/Green", pick_color_rg)]
 BUTTON_RECT = pygame.Rect(WIDTH - 20 - 120, 8, 120, 24)
 
 def draw_button(screen, font, label):
@@ -76,12 +76,12 @@ def make_band_ranges(rate):
         ranges.append((lo, max(hi, lo + 1)))
     return ranges
 
-def compute_levels(band_ranges, window, tilt):
+def compute_levels(band_ranges, window, tilt, gain_db):
     spectrum = np.abs(np.fft.rfft(buffer*window)) / (FFT_SIZE / 2)
     db = np.zeros(COLS)
     for i, (lo, hi) in enumerate(band_ranges):
         db[i] = 20 * np.log10(spectrum[lo:hi].max() + 1e-10)
-    db += tilt
+    db += tilt + gain_db
     scaled = (db - DB_FLOOR) / (DB_CEIL - DB_FLOOR)
     return np.clip(scaled, 0, 1) * ROWS
 
@@ -98,6 +98,7 @@ pygame.display.set_caption("Audio Visualizer")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("arial", 16)
 mode = 0
+gain_db = 0
 
 smooth = np.zeros(COLS)
 
@@ -113,19 +114,26 @@ with sd.InputStream(
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                if event.key == pygame.K_UP:
+                    gain_db += 2
+                if event.key == pygame.K_DOWN:
+                    gain_db -= 2
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if BUTTON_RECT.collidepoint(event.pos):
                     mode = (mode + 1) % len(COLOR_MODES)
 
-        target = compute_levels(band_ranges, window, tilt)
+        target = compute_levels(band_ranges, window, tilt, gain_db)
         smooth = np.where(target > smooth, target, np.maximum(target, smooth - FALL_SPEED))
 
         label, color_fn = COLOR_MODES[mode]
         screen.fill(BG_COLOR)
         draw_grid(screen, np.round(smooth).astype(int), color_fn)
         draw_button(screen, font, label)
+        gain_text = font.render(f"Gain: {gain_db:+d} dB", True, (150, 150, 150))
+        screen.blit(gain_text, (MARGIN, 10))
         pygame.display.flip()
         clock.tick(FPS)
 
