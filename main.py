@@ -4,7 +4,7 @@ import pygame
 import colorsys
 import time
 from spotify import spotify_now_playing
-from monitor import active_on_monitor, hide_window, monitor_of, show_window
+from monitor import active_on_monitor, cursor_on_monitor, hide_from_alt_tab, hide_window, monitor_of, show_window
 
 DEVICE = 41
 DISPLAY = 1
@@ -108,6 +108,7 @@ gain_db = 40
 
 hwnd = pygame.display.get_wm_info()["window"]
 my_monitor = monitor_of(hwnd)
+hide_from_alt_tab(hwnd)
 visible = True
 
 smooth = np.zeros(COLS)
@@ -144,7 +145,8 @@ with sd.InputStream(
             playing = spotify_now_playing()
             last_check = now
 
-        want_visible = playing and not active_on_monitor(hwnd, my_monitor)
+        user_here = active_on_monitor(hwnd, my_monitor) or cursor_on_monitor(my_monitor)
+        want_visible = bool(playing) and not user_here
         if want_visible != visible:
             if want_visible:
                 show_window(hwnd)
