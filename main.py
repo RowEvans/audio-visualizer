@@ -4,9 +4,10 @@ import pygame
 import colorsys
 import time
 from spotify import spotify_now_playing
+from monitor import active_on_monitor, hide_window, monitor_of, show_window
 
-DEVICE = 14
-DISPLAY = 0
+DEVICE = 41
+DISPLAY = 1
 
 WIDTH, HEIGHT = 800, 480
 FPS = 60
@@ -103,7 +104,11 @@ pygame.display.set_caption("Audio Visualizer")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("arial", 16)
 mode = 0
-gain_db = 0
+gain_db = 40
+
+hwnd = pygame.display.get_wm_info()["window"]
+my_monitor = monitor_of(hwnd)
+visible = True
 
 smooth = np.zeros(COLS)
 playing = None
@@ -139,11 +144,17 @@ with sd.InputStream(
             playing = spotify_now_playing()
             last_check = now
 
-        if not playing:
+        want_visible = playing and not active_on_monitor(hwnd, my_monitor)
+        if want_visible != visible:
+            if want_visible:
+                show_window(hwnd)
+            else:
+                hide_window(hwnd)
+            visible = want_visible
+
+        if not want_visible:
             smooth[:] = 0
-            screen.fill((0, 0, 0))
-            pygame.display.flip()
-            clock.tick(FPS)
+            clock.tick(20)
             continue
 
         target = compute_levels(band_ranges, window, tilt, gain_db)
@@ -153,8 +164,6 @@ with sd.InputStream(
         screen.fill(BG_COLOR)
         draw_grid(screen, np.round(smooth).astype(int), color_fn)
         draw_button(screen, font, label)
-        gain_text = font.render(f"Gain: {gain_db:+d} dB", True, (150, 150, 150))
-        screen.blit(gain_text, (MARGIN, 10))
         song_surf = font.render(f"{playing}", True, (150, 150, 150))
         screen.blit(song_surf, song_surf.get_rect(center=(WIDTH // 2, HEIGHT - MARGIN // 2)))
         pygame.display.flip()
