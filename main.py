@@ -4,10 +4,13 @@ import pygame
 import colorsys
 import time
 from spotify import spotify_now_playing
-from monitor import active_on_monitor, cursor_on_monitor, hide_from_alt_tab, hide_window, monitor_of, show_window
+from monitor import active_on_monitor, cursor_on_monitor, hide_from_alt_tab, hide_window, monitor_of, show_window, set_opacity
 
 DEVICE = 41
 DISPLAY = 1
+
+IDLE_DELAY = 3
+FADE_SECONDS = 0.5
 
 WIDTH, HEIGHT = 800, 480
 FPS = 60
@@ -33,33 +36,17 @@ DB_CEIL = -25
 TILT_DB = 18
 FALL_SPEED = 0.35
 
-def pick_color_rg(row):
-    t = row / (ROWS - 1)
-    hue = (1 - t) * (120 / 360)
-    r, g, b = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
-    return (int(r * 255), int(g * 255), int(b * 255))
-
 def pick_color_gray(row):
     t = row / (ROWS - 1)
     v = int(LIGHT_GRAY + (DARK_GRAY - LIGHT_GRAY) * t)
     return (v, v, v)
 
-COLOR_MODES = [("Gray", pick_color_gray), ("Red/Green", pick_color_rg)]
-BUTTON_RECT = pygame.Rect(WIDTH - 20 - 120, 8, 120, 24)
-
-def draw_button(screen, font, label):
-    hovered = BUTTON_RECT.collidepoint(pygame.mouse.get_pos())
-    bg = (75, 75, 85) if hovered else (50, 50, 58)
-    pygame.draw.rect(screen, bg, BUTTON_RECT, border_radius=6)
-    text = font.render(label, True, (230, 230, 230))
-    screen.blit(text, text.get_rect(center=BUTTON_RECT.center))
-
-def draw_grid(screen, levels, color_fn):
+def draw_grid(screen, levels):
     for col in range(COLS):
         x = MARGIN + col * (CELL_WIDTH + GAP)
         for row in range(ROWS):
             y = HEIGHT - MARGIN - CELL_HEIGHT - row * (CELL_HEIGHT + GAP)
-            color = color_fn(row) if row < levels[col] else OFF_COLOR
+            color = pick_color_gray(row) if row < levels[col] else OFF_COLOR
             pygame.draw.rect(screen, color, (x, y , CELL_WIDTH, CELL_HEIGHT))
 
 buffer = np.zeros(FFT_SIZE, dtype=np.float32)
@@ -103,12 +90,13 @@ screen = pygame.display.set_mode(
 pygame.display.set_caption("Audio Visualizer")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("arial", 16)
-mode = 0
 gain_db = 40
 
 hwnd = pygame.display.get_wm_info()["window"]
 my_monitor = monitor_of(hwnd)
 hide_from_alt_tab(hwnd)
+last_user_here = time.time()
+opacity = 1.0
 visible = True
 
 smooth = np.zeros(COLS)
@@ -136,9 +124,6 @@ with sd.InputStream(
                     gain_db -= 2
                 if event.key == pygame.K_f:
                     pygame.display.toggle_fullscreen()
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if BUTTON_RECT.collidepoint(event.pos):
-                    mode = (mode + 1) % len(COLOR_MODES)
 
         now = time.time()
         if now - last_check > 1.0:
@@ -146,9 +131,14 @@ with sd.InputStream(
             last_check = now
 
         user_here = active_on_monitor(hwnd, my_monitor) or cursor_on_monitor(my_monitor)
-        want_visible = bool(playing) and not user_here
+        if user_here:
+            last_user_here = time.time()
+        away_long_enough = time.time() - last_user_here >= IDLE_DELAY
+        want_visible = bool(playing) and away_long_enough
         if want_visible != visible:
             if want_visible:
+                opacity = 0.0
+                set_opacity(hwnd, 0)
                 show_window(hwnd)
             else:
                 hide_window(hwnd)
@@ -159,13 +149,15 @@ with sd.InputStream(
             clock.tick(20)
             continue
 
+        if opacity < 1.0:
+            opacity = min(1.0, opacity + 1 / (FPS * FADE_SECONDS))
+            set_opacity(hwnd, int(opacity * 255))
+
         target = compute_levels(band_ranges, window, tilt, gain_db)
         smooth = np.where(target > smooth, target, np.maximum(target, smooth - FALL_SPEED))
 
-        label, color_fn = COLOR_MODES[mode]
         screen.fill(BG_COLOR)
-        draw_grid(screen, np.round(smooth).astype(int), color_fn)
-        draw_button(screen, font, label)
+        draw_grid(screen, np.round(smooth).astype(int))
         song_surf = font.render(f"{playing}", True, (150, 150, 150))
         screen.blit(song_surf, song_surf.get_rect(center=(WIDTH // 2, HEIGHT - MARGIN // 2)))
         pygame.display.flip()

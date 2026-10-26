@@ -60,15 +60,26 @@ def hide_from_alt_tab(hwnd):
     # The window must be hidden while its style changes
     user32.ShowWindow(hwnd, SW_HIDE)
     style = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
-    style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
+    style = (style | WS_EX_TOOLWINDOW | WS_EX_LAYERED) & ~WS_EX_APPWINDOW
     user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style)
+    set_opacity(hwnd, 255)
     user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
-
-    user32.MonitorFromPoint.argtypes = [wintypes.POINT, wintypes.DWORD]
-user32.MonitorFromPoint.restype = wintypes.HANDLE
 
 
 def cursor_on_monitor(my_monitor):
     p = wintypes.POINT()
     user32.GetCursorPos(ctypes.byref(p))
     return user32.MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST) == my_monitor
+
+
+WS_EX_LAYERED = 0x00080000
+LWA_ALPHA = 0x00000002
+
+user32.SetLayeredWindowAttributes.argtypes = [
+    wintypes.HWND, wintypes.DWORD, ctypes.c_ubyte, wintypes.DWORD,
+]
+
+
+def set_opacity(hwnd, alpha):
+    # alpha runs from 0 (invisible) to 255 (solid)
+    user32.SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA)
