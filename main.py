@@ -4,7 +4,7 @@ import pygame
 import colorsys
 import time
 from spotify import spotify_now_playing
-from monitor import active_on_monitor, cursor_on_monitor, hide_from_alt_tab, hide_window, monitor_of, show_window, set_opacity
+from monitor import active_on_monitor, cursor_on_monitor, hide_from_alt_tab, hide_window, monitor_of, show_window, set_opacity, hotkey_down
 
 DEVICE = 41
 DISPLAY = 1
@@ -97,6 +97,8 @@ my_monitor = monitor_of(hwnd)
 hide_from_alt_tab(hwnd)
 last_user_here = time.time()
 opacity = 1.0
+enabled = True
+hotkey_was_down = False
 visible = True
 
 smooth = np.zeros(COLS)
@@ -124,6 +126,10 @@ with sd.InputStream(
                     gain_db -= 2
                 if event.key == pygame.K_f:
                     pygame.display.toggle_fullscreen()
+        hotkey_now = hotkey_down()
+        if hotkey_now and not hotkey_was_down:
+            enabled = not enabled
+        hotkey_was_down = hotkey_now
 
         now = time.time()
         if now - last_check > 1.0:
@@ -134,7 +140,7 @@ with sd.InputStream(
         if user_here:
             last_user_here = time.time()
         away_long_enough = time.time() - last_user_here >= IDLE_DELAY
-        want_visible = bool(playing) and away_long_enough
+        want_visible = enabled and bool(playing) and away_long_enough      
         if want_visible != visible:
             if want_visible:
                 opacity = 0.0

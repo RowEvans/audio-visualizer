@@ -83,3 +83,17 @@ user32.SetLayeredWindowAttributes.argtypes = [
 def set_opacity(hwnd, alpha):
     # alpha runs from 0 (invisible) to 255 (solid)
     user32.SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA)
+
+VK_CONTROL = 0x11
+VK_MENU = 0x12  # the Alt key
+VK_V = 0x56
+
+user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
+user32.GetAsyncKeyState.restype = ctypes.c_short
+
+
+def hotkey_down():
+    def down(vk):
+        return bool(user32.GetAsyncKeyState(vk) & 0x8000)
+
+    return down(VK_CONTROL) and down(VK_MENU) and down(VK_V)
